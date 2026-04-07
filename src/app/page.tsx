@@ -19,7 +19,8 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const timer = setTimeout(() => setMounted(true), 0)
+    return () => clearTimeout(timer)
   }, [])
 
   // Sync theme setting
@@ -34,7 +35,8 @@ export default function Home() {
     if (mounted && data.onboarded) {
       const todayKey = formatDateKey(new Date())
       if (!data.records[todayKey]) {
-        setRecordSheetOpen(true)
+        const timer = setTimeout(() => setRecordSheetOpen(true), 0)
+        return () => clearTimeout(timer)
       }
     }
   }, [mounted, data.onboarded]) // eslint-disable-line react-hooks/exhaustive-deps

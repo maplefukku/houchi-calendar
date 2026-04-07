@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
   },
 }))
 

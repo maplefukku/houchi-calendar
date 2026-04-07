@@ -4,14 +4,14 @@ import userEvent from '@testing-library/user-event'
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
   },
 }))
 
 vi.mock('lucide-react', () => ({
-  ChevronLeft: (props: any) => <span data-testid="chevron-left" {...props} />,
-  ChevronRight: (props: any) => <span data-testid="chevron-right" {...props} />,
-  Settings: (props: any) => <span data-testid="settings-icon" {...props} />,
+  ChevronLeft: (props: Record<string, unknown>) => <span data-testid="chevron-left" {...props} />,
+  ChevronRight: (props: Record<string, unknown>) => <span data-testid="chevron-right" {...props} />,
+  Settings: (props: Record<string, unknown>) => <span data-testid="settings-icon" {...props} />,
 }))
 
 import { CalendarView } from '@/components/calendar-view'

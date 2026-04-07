@@ -1,28 +1,29 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { render } from '@testing-library/react'
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
   },
 }))
 
 vi.mock('@base-ui/react/dialog', () => ({
   Dialog: {
-    Root: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-    Trigger: ({ children }: any) => <div>{children}</div>,
-    Close: ({ children, render, ...props }: any) => (
+    Root: ({ children, open }: Record<string, unknown>) => (open ? <div>{children}</div> : null),
+    Trigger: ({ children }: Record<string, unknown>) => <div>{children}</div>,
+    Close: ({ children, ...props }: Record<string, unknown>) => (
       <button {...props}>{children}</button>
     ),
-    Portal: ({ children }: any) => <div>{children}</div>,
-    Backdrop: ({ children }: any) => <div>{children}</div>,
-    Popup: ({ children }: any) => <div>{children}</div>,
-    Title: ({ children, className }: any) => (
-      <h2 className={className}>{children}</h2>
+    Portal: ({ children }: Record<string, unknown>) => <div>{children}</div>,
+    Backdrop: ({ children }: Record<string, unknown>) => <div>{children}</div>,
+    Popup: ({ children }: Record<string, unknown>) => <div>{children}</div>,
+    Title: ({ children, className }: Record<string, unknown>) => (
+      <h2 className={className as string}>{children}</h2>
     ),
-    Description: ({ children, className }: any) => (
-      <p className={className}>{children}</p>
+    Description: ({ children, className }: Record<string, unknown>) => (
+      <p className={className as string}>{children}</p>
     ),
   },
 }))
