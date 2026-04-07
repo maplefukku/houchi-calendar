@@ -1,117 +1,155 @@
-# 放置カレンダー（houchi-calendar） - 実装プロンプト
+# PROMPT.md — 認証+DB実装（放置カレンダー）
 
-## プロダクト概要
-毎日Yes/Noで「放置」を見える化するカレンダーアプリ。
+## 背景
+「放置カレンダー（ほうちカレンダー）」アプリの認証・DB基盤を構築する。
+ユーザーが毎日「やった/やらなかった」を記録し、カレンダーで可視化するアプリ。
 
-**ターゲット**: 21歳大学生
-**機能**: Yes/No入力 + カレンダー表示
-**特徴**: 入力10秒、視覚的フィードバック即座
+## 対象リポジトリ
+`~/repos/houchi-calendar`
 
----
+## 実装内容
 
-## 技術スタック
-- **Framework**: Next.js 16 (App Router, TypeScript, Tailwind CSS)
-- **UI Components**: shadcn/ui (カスタマイズ必須)
-- **Animation**: framer-motion
-- **Auth + DB**: Supabase
-- **LLM**: GLM API (glm-4.7, OpenAI互換) — **OpenAI/GPT禁止**
+### 1. Supabaseクライアント設定
 
----
+#### src/lib/supabase/client.ts
+```typescript
+import { createBrowserClient } from '@supabase/ssr'
 
-## 画面構成（4画面）
-
-### 1. ウェルカム (/welcome)
-**目的**: プロダクトを理解させ、始めさせる
-
-**コンポーネント**:
-- ヒーロー見出し: 「放置した日、見えてる？」
-- サブテキスト: 「毎日ひとつだけ答える。やったか、やらなかったか。」
-- CTAボタン: 「始める」→ ローカルストレージに初回フラグ保存 → / に遷移
-
-### 2. カレンダー（ホーム） (/)
-**目的**: 月間の放置状況を可視化
-
-**コンポーネント**:
-- ヘッダー: 年月表示 + 設定アイコン
-- 月間カレンダーグリッド
-  - Yesの日 = 緑のドット
-  - Noの日 = 赤のドット
-  - 未記録 = グレーのドット
-- 統計カード: 「今月の行動率 XX%」
-- 記録ボタン: 「今日の記録」→ 記録シート表示
-
-### 3. 記録シート（ボトムシート）
-**目的**: 今日のYes/Noを記録
-
-**コンポーネント**:
-- 質問: 「今日、自分の未来のために何かやった？」
-- Yesボタン（緑）: クリック → 緑ドットでカレンダーに反映
-- Noボタン（赤）: クリック → 赤ドットでカレンダーに反映
-- 完了フィードバック: 「記録しました」→ 自動で閉じる
-
-### 4. 設定シート（ボトムシート）
-**目的**: 通知時間のカスタマイズ
-
-**コンポーネント**:
-- 通知時間設定: デフォルト21:00
-- 通知ON/OFFスイッチ
-
----
-
-## API Routes実装
-
-### GET /api/status
-月間状態取得（?year=2026&month=4）
-
-**Response**:
-```json
-{
-  "days": [
-    { "date": "2026-04-01", "did_action": true },
-    { "date": "2026-04-02", "did_action": false }
-  ]
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 ```
 
-### POST /api/status
-日次状態登録
+#### src/lib/supabase/server.ts
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-**Request**:
-```json
-{
-  "date": "2026-04-07",
-  "did_action": true
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
 }
 ```
 
-**Response**:
-```json
-{
-  "success": true,
-  "date": "2026-04-07",
-  "did_action": true
+### 2. 認証コールバック
+
+#### src/app/auth/callback/route.ts
+```typescript
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/'
+
+  if (code) {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`)
+    }
+  }
+
+  // エラー時はホームにリダイレクト
+  return NextResponse.redirect(`${origin}`)
 }
 ```
 
-### GET /api/trend
-傾向分析（GLM API使用）
+### 3. ミドルウェア
 
-**Response**:
-```json
-{
-  "summary": "今月は20日中15日（75%）行動しています。",
-  "suggestions": [
-    "週末は事前に「土曜にやること」を決めておくと良いかも"
-  ]
+#### src/middleware.ts
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // セッションをリフレッシュ
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // 認証が必要なパスの保護（履歴など）
+  const protectedPaths = ['/history', '/settings']
+  const isProtectedPath = protectedPaths.some(path => 
+    request.nextUrl.pathname.startsWith(path)
+  )
+
+  if (isProtectedPath && !session) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
+  }
+
+  return supabaseResponse
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }
 ```
 
----
+### 4. DBスキーマ作成
 
-## DB Schema (Supabase)
+Supabaseマイグレーションファイルを作成:
+`supabase/migrations/001_init.sql`
 
-### profiles テーブル
 ```sql
+-- ユーザーテーブル（Supabase Authと連携）
 CREATE TABLE public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT,
@@ -119,10 +157,8 @@ CREATE TABLE public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
 
-### days テーブル
-```sql
+-- 日次状態テーブル
 CREATE TABLE public.days (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -131,107 +167,130 @@ CREATE TABLE public.days (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, date)
 );
+
+-- インデックス
+CREATE INDEX idx_days_user_id ON public.days(user_id);
+CREATE INDEX idx_days_date ON public.days(date);
+CREATE INDEX idx_days_user_date ON public.days(user_id, date);
+
+-- RLS有効化
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.days ENABLE ROW LEVEL SECURITY;
+
+-- RLSポリシー: profiles
+CREATE POLICY "Users can view own profile"
+  ON public.profiles FOR SELECT
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+-- RLSポリシー: days
+CREATE POLICY "Users can view own days"
+  ON public.days FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own days"
+  ON public.days FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own days"
+  ON public.days FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- トリガー: 新規ユーザー作成時にprofiles自動作成
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email)
+  VALUES (NEW.id, NEW.email);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
 
-**RLS有効化**: ユーザーは自分のデータのみアクセス可能
+### 5. 環境変数
 
----
-
-## 環境変数
-
+#### .env.local (ローカル開発用)
 ```bash
-# .env.local
-NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key
-
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 GLM_API_KEY=d4d5b41fda2845b48f8f55c4e3a1e3e9.TMSBR1aLRdCgSkEo
 GLM_BASE_URL=https://api.z.ai/api/coding/paas/v4/
 GLM_MODEL=glm-4.7
 ```
 
----
+### 6. 型定義
 
-## 実装手順（TDD厳守）
+#### src/types/index.ts
+```typescript
+export interface DayStatus {
+  id: string;
+  user_id: string;
+  date: string;
+  did_action: boolean;
+  created_at: string;
+}
 
-### Phase 1: プロジェクト初期化
-1. shadcn/ui初期化: `npx shadcn@latest init`
-2. 必要なコンポーネント追加: `npx shadcn@latest add button card`
-3. framer-motion, lucide-react, next-themes, @supabase/supabase-js, @supabase/ssr インストール
-4. vitest設定
+export interface Profile {
+  id: string;
+  email: string;
+  notification_time: string;
+  created_at: string;
+  updated_at: string;
+}
+```
 
-### Phase 2: API実装
-1. src/app/api/status/route.ts 作成
-2. テスト作成: tests/api/status-route.test.ts
-3. src/app/api/trend/route.ts 作成（GLM API使用）
-4. テスト作成: tests/api/trend-route.test.ts
+## Supabaseプロジェクト作成手順
 
-### Phase 3: Supabase設定
-1. src/lib/supabase/client.ts 作成
-2. src/lib/supabase/server.ts 作成
-3. src/proxy.ts 作成（認証ミドルウェア）
-4. supabase/migrations/001_init.sql 作成
+1. `supabase login` でログイン
+2. `supabase projects create houchi-calendar --region ap-northeast-1` でプロジェクト作成
+3. `supabase link --project-ref <project-ref>` でリンク
+4. `supabase db push` でマイグレーション適用
 
-### Phase 4: UI実装
-1. src/app/page.tsx 実装（カレンダー表示）
-2. src/app/welcome/page.tsx 実装（ウェルカム画面）
-3. src/components/calendar-grid.tsx 実装
-4. src/components/status-sheet.tsx 実装
-5. テスト作成: tests/components/*.test.tsx
+## Vercel環境変数設定
 
-### Phase 5: 統合・確認
-1. `npm run build` 成功確認
-2. `npx vitest run --coverage` カバレッジ60%以上確認
-3. TypeScriptエラーなし確認
-4. Lintエラーなし確認
+デプロイ前に以下を設定:
+```bash
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+vercel env add GLM_API_KEY
+vercel env add GLM_BASE_URL
+vercel env add GLM_MODEL
+```
 
----
+## 実行手順
 
-## DESIGN_SYSTEM.md準拠チェックリスト
-
-### 禁止事項
-- [ ] グラデーション背景使用禁止
-- [ ] shadow-lg以上の影使用禁止
-- [ ] border-border/50以外の濃いボーダー禁止
-- [ ] 色を3色以上使用禁止（グレースケール + 緑/赤のみ）
-- [ ] rounded-2xl / rounded-full以外の角丸禁止
-- [ ] p-4未満のパディング禁止
-- [ ] アイコンだけのボタン禁止
-- [ ] 英語のまま残す禁止
-- [ ] shadcn/uiデフォルトそのまま禁止
-
-### 必須実装
-- [ ] framer-motionアニメーション
-- [ ] ボタンhover/active状態
-- [ ] スケルトンUI
-- [ ] ダークモード対応（next-themes）
-- [ ] テスト作成（TDD）
-
----
-
-## 完了条件
-1. `npm run build` が成功
-2. `npx vitest run` が全て成功
-3. `npm run lint` がエラーなし
-4. TypeScriptエラーなし
-5. テストカバレッジ60%以上
-6. 全4画面が実装され、画面遷移が動作する
-7. Yes/No記録がカレンダーに反映される
-8. DESIGN_SYSTEM.mdの禁止事項に違反していない
-
----
+1. 依存関係インストール: `npm install @supabase/supabase-js @supabase/ssr`
+2. Supabaseプロジェクト作成: `supabase projects create`
+3. マイグレーション作成・適用: `supabase migration new init` → `supabase db push`
+4. 環境変数設定: `.env.local` 作成
+5. テスト実行: `npm test`
+6. ビルド確認: `npm run build`
 
 ## 注意事項
-- **OpenAI API / GPT は絶対に使わない。GLM APIのみ**
-- **自分でコードを書かない。Claude Codeに委任**
-- **テスト駆動開発（TDD）で実装**
-- **1画面1意思決定を守る**
-- **日本語UIは翻訳くさくない自然な表現**
-- **MVPではLocalStorageを使用（Supabaseは設定のみ）**
 
----
+- LLM API: GLM API (GLM-4.7) のみ使用。OpenAI/GPT/OpenRouter禁止
+- 環境変数: `GLM_API_KEY=d4d5b41fda2845b48f8f55c4e3a1e3e9.TMSBR1aLRdCgSkEo`
+- Base URL: `https://api.z.ai/api/coding/paas/v4/`
+- テストを書くこと
+- TypeScript strict mode
+- 日本語UI（翻訳くさくない自然な日本語）
 
-## 背景と意図
-このプロダクトは「若者から世界をよくする」という信念のもと開発している。
-ターゲットは21歳大学生。「やろうと思ってるけどやってない」状態で困っている。
-放置した期間が可視化され、「赤い日を見たくない」という動機で行動が変わることを検証する。
-Apple/Notion/Linearレベルのデザイン品質で、人間が「使いたい」と思うプロダクトを作る。
+## 完了条件
+
+- [ ] Supabaseプロジェクト作成済み
+- [ ] lib/supabase/client.ts 実装
+- [ ] lib/supabase/server.ts 実装
+- [ ] app/auth/callback/route.ts 実装
+- [ ] DBスキーマ+RLS 適用済み
+- [ ] middleware.ts 実装
+- [ ] サインアップフロー検証
+- [ ] Vercel環境変数設定
+- [ ] テスト全件パス
+- [ ] npm run build 成功
