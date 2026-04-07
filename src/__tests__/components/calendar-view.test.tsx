@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => <div {...props}>{children}</div>,
   },
 }))
 
 vi.mock('lucide-react', () => ({
-  ChevronLeft: (props: Record<string, unknown>) => <span data-testid="chevron-left" {...props} />,
-  ChevronRight: (props: Record<string, unknown>) => <span data-testid="chevron-right" {...props} />,
-  Settings: (props: Record<string, unknown>) => <span data-testid="settings-icon" {...props} />,
+  ChevronLeft: (props: { [key: string]: unknown }) => <span data-testid="chevron-left" {...props} />,
+  ChevronRight: (props: { [key: string]: unknown }) => <span data-testid="chevron-right" {...props} />,
+  Settings: (props: { [key: string]: unknown }) => <span data-testid="settings-icon" {...props} />,
 }))
 
 import { CalendarView } from '@/components/calendar-view'

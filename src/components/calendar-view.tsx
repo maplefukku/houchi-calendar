@@ -172,14 +172,12 @@ export function CalendarView({
 
         {/* Record today button */}
         {isCurrentMonth && todayUnrecorded && (
-          <motion.div whileTap={{ scale: 0.95 }}>
-            <Button
-              className="h-12 w-full rounded-full text-base"
-              onClick={onRecordToday}
-            >
-              今日を記録する
-            </Button>
-          </motion.div>
+          <Button
+            className="h-12 w-full rounded-full text-base active:scale-[0.95] transition-transform"
+            onClick={onRecordToday}
+          >
+            今日を記録する
+          </Button>
         )}
       </div>
     </motion.div>

@@ -1,7 +1,5 @@
 "use client"
 
-import { motion } from "framer-motion"
-
 import { formatJapaneseDate } from "@/lib/calendar"
 import { Button } from "@/components/ui/button"
 import {
@@ -49,25 +47,21 @@ export function RecordSheet({
           </SheetHeader>
 
           <div className="flex flex-col gap-3">
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="default"
-                className="h-14 w-full rounded-full"
-                onClick={() => onRecord("yes")}
-              >
-                やった
-              </Button>
-            </motion.div>
+            <Button
+              variant="default"
+              className="h-14 w-full rounded-full active:scale-[0.95] transition-transform"
+              onClick={() => onRecord("yes")}
+            >
+              やった
+            </Button>
 
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="outline"
-                className="h-14 w-full rounded-full"
-                onClick={() => onRecord("no")}
-              >
-                やらなかった
-              </Button>
-            </motion.div>
+            <Button
+              variant="outline"
+              className="h-14 w-full rounded-full active:scale-[0.95] transition-transform"
+              onClick={() => onRecord("no")}
+            >
+              やらなかった
+            </Button>
           </div>
         </div>
       </SheetContent>

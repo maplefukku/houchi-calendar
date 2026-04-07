@@ -26,15 +26,13 @@ export function Welcome({ onStart }: WelcomeProps) {
           </p>
         </div>
 
-        <motion.div whileTap={{ scale: 0.95 }}>
-          <Button
-            variant="default"
-            className="h-12 rounded-full px-8 text-base"
-            onClick={onStart}
-          >
-            始める
-          </Button>
-        </motion.div>
+        <Button
+          variant="default"
+          className="h-12 rounded-full px-8 text-base active:scale-[0.95] transition-transform"
+          onClick={onStart}
+        >
+          始める
+        </Button>
       </div>
     </motion.div>
   )

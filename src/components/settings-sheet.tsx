@@ -1,7 +1,5 @@
 "use client"
 
-import { motion } from "framer-motion"
-
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
@@ -93,15 +91,15 @@ export function SettingsSheet({
                   { value: "system", label: "自動" },
                 ] as const
               ).map(({ value, label }) => (
-                <motion.div key={value} whileTap={{ scale: 0.95 }} className="flex-1">
+                <div key={value} className="flex-1">
                   <Button
                     variant={settings.theme === value ? "secondary" : "ghost"}
-                    className="w-full rounded-full"
+                    className="w-full rounded-full active:scale-[0.95] transition-transform"
                     onClick={() => onSettingsChange({ theme: value })}
                   >
                     {label}
                   </Button>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -110,15 +108,13 @@ export function SettingsSheet({
 
           {/* データ削除 */}
           <div className="flex flex-col gap-3">
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="destructive"
-                className="w-full rounded-full"
-                onClick={handleDeleteData}
-              >
-                すべてのデータを削除
-              </Button>
-            </motion.div>
+            <Button
+              variant="destructive"
+              className="w-full rounded-full active:scale-[0.95] transition-transform"
+              onClick={handleDeleteData}
+            >
+              すべてのデータを削除
+            </Button>
           </div>
         </div>
       </SheetContent>

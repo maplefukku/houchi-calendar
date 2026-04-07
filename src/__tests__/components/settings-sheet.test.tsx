@@ -2,28 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => <div {...props}>{children}</div>,
   },
 }))
 
 vi.mock('@base-ui/react/dialog', () => ({
   Dialog: {
-    Root: ({ children, open }: Record<string, unknown>) => (open ? <div>{children}</div> : null),
-    Trigger: ({ children }: Record<string, unknown>) => <div>{children}</div>,
-    Close: ({ children, ...props }: Record<string, unknown>) => (
+    Root: ({ children, open }: { children?: ReactNode; open?: boolean }) => (open ? <div>{children}</div> : null),
+    Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Close: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => (
       <button {...props}>{children}</button>
     ),
-    Portal: ({ children }: Record<string, unknown>) => <div>{children}</div>,
-    Backdrop: ({ children }: Record<string, unknown>) => <div>{children}</div>,
-    Popup: ({ children }: Record<string, unknown>) => <div>{children}</div>,
-    Title: ({ children, className }: Record<string, unknown>) => (
-      <h2 className={className as string}>{children}</h2>
+    Portal: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Backdrop: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Popup: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Title: ({ children, className }: { children?: ReactNode; className?: string }) => (
+      <h2 className={className}>{children}</h2>
     ),
-    Description: ({ children, className }: Record<string, unknown>) => (
-      <p className={className as string}>{children}</p>
+    Description: ({ children, className }: { children?: ReactNode; className?: string }) => (
+      <p className={className}>{children}</p>
     ),
   },
 }))

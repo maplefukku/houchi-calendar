@@ -21,9 +21,9 @@ describe('middleware', () => {
   it('allows public paths without session', async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } })
 
-    const { middleware } = await import('@/middleware')
+    const { proxy } = await import('@/proxy')
     const request = new NextRequest('http://localhost:3000/')
-    const response = await middleware(request)
+    const response = await proxy(request)
 
     expect(response.status).toBe(200)
   })
@@ -31,9 +31,9 @@ describe('middleware', () => {
   it('redirects protected paths when not authenticated', async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } })
 
-    const { middleware } = await import('@/middleware')
+    const { proxy } = await import('@/proxy')
     const request = new NextRequest('http://localhost:3000/history')
-    const response = await middleware(request)
+    const response = await proxy(request)
 
     expect(response.status).toBe(307)
     expect(new URL(response.headers.get('location')!).pathname).toBe('/')
@@ -44,15 +44,15 @@ describe('middleware', () => {
       data: { session: { user: { id: 'user-1' } } },
     })
 
-    const { middleware } = await import('@/middleware')
+    const { proxy } = await import('@/proxy')
     const request = new NextRequest('http://localhost:3000/settings')
-    const response = await middleware(request)
+    const response = await proxy(request)
 
     expect(response.status).toBe(200)
   })
 
   it('exports correct matcher config', async () => {
-    const { config } = await import('@/middleware')
+    const { config } = await import('@/proxy')
     expect(config.matcher).toBeDefined()
     expect(config.matcher.length).toBeGreaterThan(0)
   })
