@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { getStorageData, setStorageData, useCalendarData } from '@/lib/storage'
+import { getStorageData, setStorageData } from '@/lib/storage'
 import { DEFAULT_CALENDAR_DATA } from '@/lib/types'
 
 function createMockStorage(): Storage {
